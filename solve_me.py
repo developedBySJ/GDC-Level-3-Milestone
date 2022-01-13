@@ -28,7 +28,7 @@ class TasksCommand:
             pass
 
     def init(self):
-        self.read_completed()
+        self.completed_items = self.read_completed() or []
         self.read_current()
 
     def write_current(self):
@@ -82,34 +82,131 @@ $ python tasks.py runserver # Starts the tasks management server"""
         )
 
     def add(self, args):
-        pass  # Use your existing implementation
+        [priority, text] = args
+        cur_priority = int(priority)
+        prev_task = text
+        while True:
+            if self.current_items.get(int(cur_priority)) == None:
+                self.current_items[int(cur_priority)] = f"{prev_task}"
+                break
+            else:
+                temp_prev_task = self.current_items[int(cur_priority)]
+                self.current_items[int(cur_priority)] = prev_task
+                prev_task = temp_prev_task
+                cur_priority += 1
+        print(f"Added task: \"{text}\" with priority {priority}")
+        self.write_current()
+        pass
 
     def done(self, args):
-        pass  # Use your existing implementation
+        priority = int(args[0])
+
+        if priority < 1 or not self.current_items.get(priority):
+            print(
+                f"Error: no incomplete item with priority {priority} exists.")
+            return
+
+        self.completed_items.append(self.current_items[priority])
+
+        del self.current_items[priority]
+        self.write_current()
+        self.write_completed()
+
+        print("Marked item as done.")
+        pass
 
     def delete(self, args):
-        pass  # Use your existing implementation
+        priority = int(args[0])
+
+        if priority < 1 or not self.current_items.get(priority):
+            print(
+                f"Error: item with priority {priority} does not exist. Nothing deleted.")
+            return
+
+        del self.current_items[priority]
+        self.write_current()
+
+        print(f"Deleted item with priority {priority}")
+        pass
 
     def ls(self):
-        pass  # Use your existing implementation
+        count = 1
+        for priority in sorted(self.current_items):
+            text = self.current_items[priority]
+            print(f"{count}. {text} [{priority}]")
+            count += 1
+        pass
 
     def report(self):
-        pass  # Use your existing implementation
+        # Print pending
+        print(f"Pending : {len(self.current_items)}")
+        self.ls()
+        print()
+
+        # print completed
+        print(f"Completed : {len(self.completed_items)}")
+        self._print_completed()
+
+    def _print_completed(self):
+        count = 1
+        for task in self.completed_items:
+            print(f"{count}. {task}")
+            count += 1
+        pass
 
     def render_pending_tasks(self):
         # Complete this method to return all incomplete tasks as HTML
-        return "<h1> Show Incomplete Tasks Here </h1>"
+        pending_task_html = ""
+
+        for priority in self.current_items:
+            text = self.current_items[priority]
+            pending_task_html += f"<li>{text} [{priority}]</li>"
+
+        return f"""
+        <div style="font-family:'Arial';" >
+            <h1> Pending Tasks </h1>
+            <ol style="font-size:1.5rem;">
+                {pending_task_html}
+            </ol>
+        <div/>
+        """
 
     def render_completed_tasks(self):
         # Complete this method to return all completed tasks as HTML
-        return "<h1> Show Completed Tasks Here </h1>"
+        completed_task_html = ""
+        for text in self.completed_items:
+            completed_task_html += f"<li>{text}</li>"
+
+        return f"""
+        <div style="font-family:'Arial';" >
+            <h1> Completed Tasks </h1>
+            <ol style="font-size:1.5rem;">
+                {completed_task_html}
+            </ol>
+        <div/>
+        """
+
+    def render_home(self):
+        return """
+        <div style="font-family:'Arial';" >
+            <h1>Todo Manager </h1>
+            <h3> 
+                <a href="/tasks">Show Pending Tasks</a> 
+            </h3>
+            <h3> 
+                <a href="/completed">Show Completed Tasks</a> 
+            </h3>
+        </div>
+        """
 
 
 class TasksServer(TasksCommand, BaseHTTPRequestHandler):
     def do_GET(self):
         task_command_object = TasksCommand()
         task_command_object.init()
-        if self.path == "/tasks":
+        if self.path == "/":
+            content = task_command_object.render_home()
+        elif self.path == "/tasks":
             content = task_command_object.render_pending_tasks()
         elif self.path == "/completed":
             content = task_command_object.render_completed_tasks()
